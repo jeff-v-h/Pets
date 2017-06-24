@@ -65,6 +65,14 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
 
     private boolean mPetHasChanged = false;
 
+    private View.OnTouchListener mTouchListener = new View.OnTouchListener() {
+        @Override
+        public boolean onTouch(View view, MotionEvent motionEvent) {
+            mPetHasChanged = true;
+            return false;
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -77,11 +85,14 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
         if (mCurrentPetUri != null) {
             // If the EditorActivity was opened using ListView item, then we will
             // have uri of pet so change app bar to "Edit Pet"
-            setTitle(R.string.editor_activity_title_edit_pet);
+            setTitle(getString(R.string.editor_activity_title_edit_pet));
             getSupportLoaderManager().initLoader(EXISTING_PET_LOADER, null, this);
         } else {
             // Otherwise if this is a new pet, uri is null so change app bar to say "Add a pet"
-            setTitle(R.string.editor_activity_title_new_pet);
+            setTitle(getString(R.string.editor_activity_title_new_pet));
+            // Invalidate the options menu, so the "Delete" menu option can be hidden.
+            // (It doesn't make sense to delete a pet that hasn't been created yet.)
+            invalidateOptionsMenu();
         }
 
         // Find all relevant views that we will need to read user input from
@@ -90,12 +101,15 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
         mWeightEditText = (EditText) findViewById(R.id.edit_pet_weight);
         mGenderSpinner = (Spinner) findViewById(R.id.spinner_gender);
 
-        setupSpinner();
-
+        // Setup OnTouchListeners on all the input fields, so we can determine if the user
+        // has touched or modified them. This will let us know if there are unsaved changes
+        // or not, if the user tries to leave the editor without saving.
         mNameEditText.setOnTouchListener(mTouchListener);
         mBreedEditText.setOnTouchListener(mTouchListener);
         mWeightEditText.setOnTouchListener(mTouchListener);
         mGenderSpinner.setOnTouchListener(mTouchListener);
+
+        setupSpinner();
     }
 
     /**
@@ -198,6 +212,21 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
         return true;
     }
 
+    /**
+     * This method is called after invalidateOptionsMenu(), so that the
+     * menu can be updated (some menu items can be hidden or made visible).
+     */
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        super.onPrepareOptionsMenu(menu);
+        // If this is a new pet, hide the "Delete" menu item.
+        if (mCurrentPetUri == null) {
+            MenuItem menuItem = menu.findItem(R.id.action_delete);
+            menuItem.setVisible(false);
+        }
+        return true;
+    }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         // User clicked on a menu option in the app bar overflow menu
@@ -291,7 +320,7 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
             // Set the data into the respective fields
             mNameEditText.setText(editingPetName);
             mBreedEditText.setText(editingPetBreed);
-            mWeightEditText.setText(Integer.toString(editingPetWeight));
+            mWeightEditText.setText(String.valueOf(editingPetWeight));
 
             // Gender is a dropdown spinner, so map the constant value from the database
             // into one of the dropdown options (0 is Unknown, 1 is Male, 2 is Female).
@@ -320,14 +349,6 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
         mWeightEditText.setText("");
         mGenderSpinner.setSelection(0); // Select "unknown" gender
     }
-
-    private View.OnTouchListener mTouchListener = new View.OnTouchListener() {
-        @Override
-        public boolean onTouch(View view, MotionEvent motionEvent) {
-            mPetHasChanged = true;
-            return false;
-        }
-    };
 
     private void showUnsavedChangesDialog(
             DialogInterface.OnClickListener discardButtonClickListener) {
